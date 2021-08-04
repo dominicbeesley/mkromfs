@@ -73,7 +73,7 @@ if (!$calcoffs) {
 
 	my %already = ();
 
-	rfs_mkfile("*$rom_title*", 0, 0, "");
+	rfs_mkfile("*$rom_title*", 0, 0, 0, []);
 
 	$#ARGV < 0 && "No files specified...exiting";
 
@@ -115,10 +115,11 @@ if (!$calcoffs) {
 
 		$inf_info->{name} =~ s/^\$\.//;
 
-		open (my $fh_bin, "<:raw:", $filebase) or die "Error opening input file $filebase : $!";
-		my $bin = do { local $/; <$fh_bin> };
+		open (my $fh_bin, "<:raw", $filebase) or die "Error opening input file $filebase : $!";
+		my $binc = do { local $/; <$fh_bin> };
 		close $fh_bin;
-		rfs_mkfile($inf_info->{name}, $inf_info->{load}, $inf_info->{exec}, $inf_info->{exec} & 0x08, $bin) or die "Error adding file $filebase : $!";
+		my @bin = unpack("C*", $binc);
+		rfs_mkfile($inf_info->{name}, $inf_info->{load}, $inf_info->{exec}, $inf_info->{exec} & 0x08, \@bin) or die "Error adding file $filebase : $!";
 
 		print "done\n";
 
@@ -202,31 +203,31 @@ sub decodeinf($$) {
 }
 
 sub rfs_mkfile($$$$$) {
-	my ($name, $load, $exec, $lock, $dat) = @_;
+	my ($name, $load, $exec, $lock, $datr) = @_;
 
 	my $name_munged = uc($name);
 	$name_munged =~ s/.*?(\\|\/)//g;
 	$name_munged =~ s/\s/_/g;
 	$name_munged =~ s/[_]+/_/g;
 	$name_munged = substr($name_munged, 0, 10);
+	my @dat = @{$datr};
 
 	my $headersize = 1 + length($name_munged) + 1 + 4 + 4 + 2 + 2 + 1 + 4 + 2;
 	my $datablocksize = 0;
 
 	my $blockno = 0;
-	while ($blockno == 0 or length($dat)) {
+	while ($blockno == 0 or scalar(@dat)) {
 
-		my $thisdat = substr($dat, 0, 255);
-		$dat = substr($dat, 255);
+		my @thisdat = splice(@dat, 0, 256);
 
-		my $datlen = length($thisdat);
+		my $datlen = scalar @thisdat;
 		if ($datlen != 0)
 		{
 			$datablocksize = $datlen + 2;
 		}
 
 
-		my $flag = ((length($dat)==0)?0x80:0x00) + (($lock)?0x01:0x00) + (($datlen == 0)?0x40:0x00);
+		my $flag = ((scalar @dat==0)?0x80:0x00) + (($lock)?0x01:0x00) + (($datlen == 0)?0x40:0x00);
 		my $bin = pack("Z* L L S S C L", $name_munged, $load, $exec, $blockno, $datlen, $flag, $DATA_OFFSET + $headersize + $datablocksize);
 		my $hdrcrc = crc($bin);
 
@@ -261,7 +262,7 @@ sub rfs_mkfile($$$$$) {
 
 		if ($datlen) {
 			my $i = 0;
-			for my $c (split //, $thisdat) {
+			for my $c (@thisdat) {
 				if (($i % 8) == 0) {
 					$data .= "
 			EQUB	";
@@ -269,11 +270,11 @@ sub rfs_mkfile($$$$$) {
 					$data .= ", ";
 				}
 
-				$data .= sprintf "&%02X", ord($c);
+				$data .= sprintf "&%02X", $c;
 				$i++;
 			}
 
-			my $datacrc = crc($thisdat);
+			my $datacrc = crc(pack("C*", @thisdat));
 			$data .= sprintf "
 			EQUW	&%04X		\\DATA CRC
 				", (($datacrc & 0xFF00) >> 8) | (($datacrc & 0xFF) << 8);
