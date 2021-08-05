@@ -3,10 +3,10 @@ perl script to make a romfs style ROM.
 
 # Requirements
 
-##BeebAsm
+## BeebAsm
 This will be used to assemble the generated assembler
 
-##Perl
+## Perl
 This is used to generate the assembler file
 
 
@@ -18,8 +18,11 @@ mkromfs.pl --title=<rom title> --version=<rom version> --copy=<copyright> --outp
                 generated with this name and shown with \*CAT
 
 --version       A version number 0..255 for the ROM
+
 --copy          A copyright message for the ROM this must start with "(C)"
+
 --output        The output filename for the generated ROM or assembler
+
 --noasm         If specified the ROM will not be assembled, instead the output will be the assembler
                 for the ROM.
 
