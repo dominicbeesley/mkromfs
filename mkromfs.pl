@@ -6,6 +6,7 @@ use Getopt::Long;
 use File::Temp qw/ tempfile tempdir /;
 use File::Basename;
 use File::Spec::Functions 'catfile';
+use POSIX;
 
 my $dirname = dirname(__FILE__);
 
@@ -215,6 +216,23 @@ sub rfs_mkfile($$$$$) {
 	my $headersize = 1 + length($name_munged) + 1 + 4 + 4 + 2 + 2 + 1 + 4 + 2;
 	my $datablocksize = 0;
 
+	my $numdatablocks = ceil((scalar @dat) / 256);
+print "===$numdatablocks\n";
+
+	my $totalsize = $headersize;
+	if ($numdatablocks > 0) {
+		if ($numdatablocks > 1) {
+			$totalsize += $headersize; # end header
+			if ($numdatablocks > 2) {
+				$totalsize += $numdatablocks-2; # inter block gaps = 1 char
+			}
+		}
+		$totalsize += $numdatablocks*2; # crcs
+		$totalsize += scalar @dat; # the data
+	}
+
+	$DATA_OFFSET += $totalsize;
+
 	my $blockno = 0;
 	while ($blockno == 0 or scalar(@dat)) {
 
@@ -228,37 +246,48 @@ sub rfs_mkfile($$$$$) {
 
 
 		my $flag = ((scalar @dat==0)?0x80:0x00) + (($lock)?0x01:0x00) + (($datlen == 0)?0x40:0x00);
-		my $bin = pack("Z* L L S S C L", $name_munged, $load, $exec, $blockno, $datlen, $flag, $DATA_OFFSET + $headersize + $datablocksize);
-		my $hdrcrc = crc($bin);
+	
+		if ($blockno == 0 or $flag & 0x80) {
+			#first or last block - emit a header
+
+			my $bin = pack("Z* L L S S C L", $name_munged, $load, $exec, $blockno, $datlen, $flag, $DATA_OFFSET);
+			my $hdrcrc = crc($bin);
 
 
-	#	print "====";
-	#	for (my $i = 0; $i < length($bin); $i++) {
-	#
-	#		if (($i % 8) == 0) {
-	#			print "\n";
-	#		}
-	#		printf " %02X", ord(substr($bin, $i, 1));
-	#
-	#	}
-	#	print "====\n";
+		#	print "====";
+		#	for (my $i = 0; $i < length($bin); $i++) {
+		#
+		#		if (($i % 8) == 0) {
+		#			print "\n";
+		#		}
+		#		printf " %02X", ord(substr($bin, $i, 1));
+		#
+		#	}
+		#	print "====\n";
 
 
-		$data .=sprintf
+			$data .=sprintf
 
-	"
-			EQUB	&2A		\\ synchronisation byte
-			EQUS	\"%s\"	\\ name
-			EQUB	0		\\ name zero term
-			EQUD	&%08X	\\ load address
-			EQUD	&%08X	\\ exec address
-			EQUW	&%04X		\\ block number
-			EQUW	&%04X		\\ block length
-			EQUB	&%02X		\\ flag
-			EQUD	&%08X	\\ next file ptr
-			EQUW	&%02X		\\ header crc
+		"
+		EQUB	&2A		\\ synchronisation byte
+		EQUS	\"%s\"	\\ name
+		EQUB	0		\\ name zero term
+		EQUD	&%08X	\\ load address
+		EQUD	&%08X	\\ exec address
+		EQUW	&%04X		\\ block number
+		EQUW	&%04X		\\ block length
+		EQUB	&%02X		\\ flag
+		EQUD	&%08X	\\ next file ptr
+		EQUW	&%02X		\\ header crc
+", $name_munged, $load, $exec, $blockno, $datlen, $flag, $DATA_OFFSET, (($hdrcrc & 0xFF00) >> 8) | (($hdrcrc & 0xFF) << 8);
 
-	", $name_munged, $load, $exec, $blockno, $datlen, $flag, $DATA_OFFSET + $headersize + $datablocksize, (($hdrcrc & 0xFF00) >> 8) | (($hdrcrc & 0xFF) << 8);
+		} else {
+
+			$data .="
+		EQUB	&23		\\ INTER BLOCK MARKER
+"
+		}
+
 
 		if ($datlen) {
 			my $i = 0;
@@ -280,7 +309,6 @@ sub rfs_mkfile($$$$$) {
 				", (($datacrc & 0xFF00) >> 8) | (($datacrc & 0xFF) << 8);
 		}
 
-		$DATA_OFFSET += $headersize + $datablocksize;
 		$blockno++;
 
 	}
