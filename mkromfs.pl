@@ -314,7 +314,7 @@ print "===$numdatablocks\n";
 	}
 
 	if ($DATA_OFFSET >= 0xBFFF) {
-		$! = "ROM full";
+		printf STDERR "ROM full : %08X\n", $DATA_OFFSET;
 		return 0;
 	} else {
 		return 1;
