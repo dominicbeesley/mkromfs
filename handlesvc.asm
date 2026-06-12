@@ -40,15 +40,20 @@ OSRDRM=&FFB9
 			RTS			\ not my call
 	\ Routine for paged ROM service call &D
 .initsp			PHA			\ save accumulator
-			JSR invsno		\ invert *ROM number
+			TYA
+			BMI negrom		\ check for negative - always select self!?
+						\ this test cribbed from Electron Snapper ROM
+			EOR #$F			\ invert rom number
+			CMP #$10		\ check for wrap around 
+			BCS exit		\ NAUG example doesn't do this and causes ifinite *CAT
 			CMP ROMid		\ compare with ROM id
 			BCC exit		\ if *ROM > me, not my call
-			LDA #data AND 255    	\ low byte of data address
+.negrom			LDA #data AND 255    	\ low byte of data address
 			STA ROMptr		\ store in pointer location
 			LDA #data DIV &100	\ high byte of data address
 			STA ROMptr+1		\ store in pointer location
 			LDA ROMid		\ get my paged ROM number
-			JSR invert		\ invert it
+			EOR #$F			\ invert it
 			STA serROM		\ make me current *ROM
 .claim			PLA			\ restore accumulator/stack
 			LDA #0			\ service call claimed
@@ -79,8 +84,7 @@ OSRDRM=&FFB9
 			JMP claim1		\ incremnt ptr & claim call
 	\ Subroutine for inverting *ROM numbers
 .invsno			LDA serROM		\ A=*ROM number
-.invert   		EOR #&FF		\ invert bits
-			AND #&F			\ mask out unwanted bits
+	   		EOR #&F			\ invert bits - NAUG example masks, but not Acornsoft
           		RTS			\ finished
 
 .data
@@ -89,4 +93,4 @@ OSRDRM=&FFB9
 .ROMend
 
 
-		SAVE "", ROMstart, ROMend
+		SAVE ROMstart, ROMend

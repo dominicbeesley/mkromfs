@@ -18,7 +18,7 @@ my $rom_output;
 my $noasm;
 my $calcoffs;
 
-my $DATA_OFFSET = 0x805D;
+my $DATA_OFFSET = 0x8060;
 
 GetOptions(
 	"title=s" => \$rom_title,
@@ -126,12 +126,14 @@ if (!$calcoffs) {
 
 		$already{$filebase}=$fin;
 	}
+
+	$data .= "
+		EQUB	&2B		\\END OF ROM MARKER
+		";
+
 }
 
 
-$data .= "
-		EQUB	&2B		\\END OF ROM MARKER
-		";
 
 my $fn_asmt = catfile($dirname, "handlesvc.asm");
 
