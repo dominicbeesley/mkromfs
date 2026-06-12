@@ -1,5 +1,9 @@
 # mkromfs
-perl script to make a romfs style ROM.
+perl script to make a RFS style ROM. This was a quick script to get me out 
+of a hole when I needed an RFS ROM. Another more recent (close source?) option 
+might be https://apps.microsoft.com/detail/9pccncrl19gh?hl=en-GB&gl=GB which
+applies compression to the files to be ROM'd
+
 
 # Requirements
 
